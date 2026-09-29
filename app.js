@@ -221,6 +221,33 @@
     $('current').hidden = false;
     $('hourly-card').hidden = false;
     $('daily-card').hidden = false;
+    renderMap();
+  }
+
+  // ---------- map (Leaflet + OpenStreetMap, no key needed) ----------
+  var map = null, marker = null;
+  function renderMap() {
+    if (typeof L === 'undefined') return; // map library failed to load; skip the map.
+    var p = state.place;
+    var ll = [p.latitude, p.longitude];
+    $('map-card').hidden = false;
+    $('map-place').textContent = '· ' + p.name;
+    if (!map) {
+      map = L.map('map', { scrollWheelZoom: false, worldCopyJump: true });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map);
+      marker = L.marker(ll).addTo(map);
+      map.setView(ll, 5);
+    } else if (map._lastPlace !== p.name + ll.join()) {
+      marker.setLatLng(ll);
+      map.flyTo(ll, 5, { duration: 1.2 });
+    }
+    map._lastPlace = p.name + ll.join();
+    marker.bindPopup(p.name);
+    // The card may have just been un-hidden; let Leaflet re-measure.
+    setTimeout(function () { map.invalidateSize(); }, 0);
   }
 
   function setPlace(place) {

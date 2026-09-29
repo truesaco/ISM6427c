@@ -16,6 +16,7 @@
       if (t !== 'system') document.documentElement.setAttribute('data-theme', t);
     })();
   </script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -82,6 +83,11 @@
       <ol id="hourly" class="hourly"></ol>
     </section>
 
+    <section id="map-card" class="card" hidden>
+      <h3>Where is it? <span id="map-place" class="map-place"></span></h3>
+      <div id="map" class="map" role="region" aria-label="Map showing the selected location"></div>
+    </section>
+
     <section id="daily-card" class="card" hidden>
       <h3>7-day forecast</h3>
       <ol id="daily" class="daily"></ol>
@@ -92,6 +98,7 @@
     Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0)
   </footer>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="app.js"></script>
 </body>
 </html>
