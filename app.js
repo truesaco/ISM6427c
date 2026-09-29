@@ -312,15 +312,20 @@
     );
   });
 
+  var unitButtons = document.querySelectorAll('[data-units]');
   function renderUnitsButton() {
-    $('btn-units').textContent = state.units === 'imperial' ? '°F' : '°C';
-    $('btn-units').title = 'Switch to ' + (state.units === 'imperial' ? 'Celsius' : 'Fahrenheit');
+    unitButtons.forEach(function (b) {
+      b.setAttribute('aria-checked', String(b.dataset.units === state.units));
+    });
   }
-  $('btn-units').addEventListener('click', function () {
-    state.units = state.units === 'imperial' ? 'metric' : 'imperial';
-    save('units', state.units);
-    renderUnitsButton();
-    refresh();
+  unitButtons.forEach(function (b) {
+    b.addEventListener('click', function () {
+      if (b.dataset.units === state.units) return;
+      state.units = b.dataset.units;
+      save('units', state.units);
+      renderUnitsButton();
+      refresh();
+    });
   });
 
   // Refresh when the tab becomes visible again so data stays current.

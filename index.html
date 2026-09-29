@@ -43,7 +43,10 @@
       <div class="control-buttons">
         <button type="button" id="btn-home" class="chip" title="Back to Boca Raton (FAU)">🦉 FAU</button>
         <button type="button" id="btn-locate" class="chip" title="Use my location">📍 Me</button>
-        <button type="button" id="btn-units" class="chip" title="Toggle units">°F</button>
+        <div class="unit-switch" role="radiogroup" aria-label="Temperature units">
+          <button type="button" role="radio" data-units="imperial" title="Fahrenheit">°F</button>
+          <button type="button" role="radio" data-units="metric" title="Celsius">°C</button>
+        </div>
       </div>
     </section>
 
