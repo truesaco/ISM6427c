@@ -202,11 +202,42 @@ a { color: var(--accent); }
   border: 1px solid var(--border); z-index: 0;
 }
 @media (min-width: 1000px) { .map { height: 100%; min-height: 340px; } #map-card { display: flex; flex-direction: column; } #map-card[hidden] { display: none; } }
-/* Darken map tiles to match the dark theme. */
-:root[data-theme="dark"] .map .leaflet-tile { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9); }
+/* Darken the base map (not the radar) to match the dark theme. */
+:root[data-theme="dark"] .map .base-tiles { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9); }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .map .leaflet-tile { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9); }
+  :root:not([data-theme="light"]) .map .base-tiles { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9); }
 }
+
+.radar-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; font-size: .9rem; }
+.radar-toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 600; }
+.chip.small { padding: 6px 10px; font-size: .85rem; box-shadow: none; }
+
+/* Storm tracker */
+.storm h4 { margin: 0 0 8px; font-size: .9rem; }
+.storm-grid { display: grid; gap: 18px; }
+.storm-text { margin: 8px 0; }
+.risk-badge {
+  display: inline-block; padding: 4px 12px; border-radius: 999px;
+  font-weight: 700; font-size: .9rem; background: var(--accent-soft);
+}
+.risk-badge.minimal { background: #d9f2e3; color: #17603a; }
+.risk-badge.low { background: #fff3c4; color: #7a5a00; }
+.risk-badge.moderate { background: #ffd9b0; color: #8a3f00; }
+.risk-badge.high { background: #ffc9c9; color: #9b1c1c; }
+.storm-facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: .92rem; }
+.alerts { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.alerts li.alert {
+  border-left: 4px solid #d6a300; background: var(--accent-soft);
+  border-radius: 8px; padding: 8px 10px;
+}
+.alerts li.alert.severe, .alerts li.alert.extreme { border-left-color: #d64545; }
+.alerts li.alert.minor { border-left-color: #4fa3ff; }
+.alerts summary { cursor: pointer; }
+.alerts .alert-body { white-space: pre-line; font-size: .88rem; margin: 8px 0 0; }
+.storm-links { margin-top: 14px; font-size: .88rem; }
+
+@media (min-width: 700px) { .storm-grid { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 1000px) { #storm-card { grid-column: 1 / -1; } }
 
 .footer { text-align: center; color: var(--muted); font-size: .85rem; padding: 12px 16px 28px; }
 

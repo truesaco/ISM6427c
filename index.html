@@ -86,11 +86,36 @@
     <section id="map-card" class="card" hidden>
       <h3>Where is it? <span id="map-place" class="map-place"></span></h3>
       <div id="map" class="map" role="region" aria-label="Map showing the selected location"></div>
+      <div class="radar-bar">
+        <label class="radar-toggle"><input type="checkbox" id="radar-toggle" checked> 🌧️ Live radar</label>
+        <button type="button" id="radar-play" class="chip small" aria-label="Play radar animation">▶ Play</button>
+        <span id="radar-time" class="muted"></span>
+      </div>
     </section>
 
     <section id="daily-card" class="card" hidden>
       <h3>7-day forecast</h3>
       <ol id="daily" class="daily"></ol>
+    </section>
+
+    <section id="storm-card" class="card storm" hidden>
+      <h3>⚡ Storm tracker</h3>
+      <div class="storm-grid">
+        <div>
+          <h4>Thunderstorm &amp; lightning risk · next 48 h</h4>
+          <p><span id="storm-badge" class="risk-badge"></span></p>
+          <p id="storm-text" class="storm-text"></p>
+          <ul id="storm-facts" class="storm-facts"></ul>
+        </div>
+        <div>
+          <h4>Active weather alerts</h4>
+          <ul id="alerts" class="alerts"></ul>
+        </div>
+      </div>
+      <p class="muted storm-links">
+        Live lightning strikes: <a href="https://www.lightningmaps.org/" target="_blank" rel="noopener">LightningMaps.org</a>
+        · Hurricanes: <a href="https://www.nhc.noaa.gov/" target="_blank" rel="noopener">National Hurricane Center</a>
+      </p>
     </section>
   </main>
 

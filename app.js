@@ -135,7 +135,7 @@
       latitude: p.latitude,
       longitude: p.longitude,
       current: 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m',
-      hourly: 'temperature_2m,precipitation_probability,weather_code,is_day',
+      hourly: 'temperature_2m,precipitation_probability,weather_code,is_day,cape,wind_gusts_10m',
       daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max',
       timezone: 'auto',
       forecast_days: 7,
@@ -153,6 +153,7 @@
       .then(function (data) {
         render(data);
         setStatus('');
+        fetchAlerts();
       })
       .catch(function (err) {
         setStatus('Could not load weather: ' + err.message + '. Retrying soon.', true);
@@ -222,6 +223,7 @@
     $('hourly-card').hidden = false;
     $('daily-card').hidden = false;
     renderMap();
+    renderStorm(d, start);
   }
 
   // ---------- map (Leaflet + OpenStreetMap, no key needed) ----------
@@ -236,10 +238,12 @@
       map = L.map('map', { scrollWheelZoom: false, worldCopyJump: true });
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 18,
+        className: 'base-tiles',
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(map);
       marker = L.marker(ll).addTo(map);
       map.setView(ll, 5);
+      loadRadar();
     } else if (map._lastPlace !== p.name + ll.join()) {
       marker.setLatLng(ll);
       map.flyTo(ll, 5, { duration: 1.2 });
@@ -248,6 +252,205 @@
     marker.bindPopup(p.name);
     // The card may have just been un-hidden; let Leaflet re-measure.
     setTimeout(function () { map.invalidateSize(); }, 0);
+  }
+
+  // ---------- live radar (RainViewer, free, no key) ----------
+  var radar = { host: '', frames: [], layers: {}, index: -1, timer: null };
+  var radarToggle = $('radar-toggle');
+  var radarPlay = $('radar-play');
+
+  function radarLayer(frame) {
+    if (!radar.layers[frame.path]) {
+      radar.layers[frame.path] = L.tileLayer(radar.host + frame.path + '/256/{z}/{x}/{y}/2/1_1.png', {
+        opacity: 0,
+        maxNativeZoom: 7, // the free radar tiles stop at zoom 7; Leaflet scales them up beyond that
+        maxZoom: 18,
+        zIndex: 10,
+        attribution: 'Radar &copy; <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>'
+      });
+    }
+    return radar.layers[frame.path];
+  }
+
+  function clearRadarLayers() {
+    Object.keys(radar.layers).forEach(function (k) { map.removeLayer(radar.layers[k]); });
+  }
+
+  function showRadarFrame(i) {
+    if (!map || !radar.frames.length || !radarToggle.checked) return;
+    var frame = radar.frames[i];
+    var layer = radarLayer(frame);
+    if (!map.hasLayer(layer)) layer.addTo(map);
+    if (radar.index >= 0 && radar.index !== i && radar.frames[radar.index]) {
+      radarLayer(radar.frames[radar.index]).setOpacity(0);
+    }
+    layer.setOpacity(0.7);
+    radar.index = i;
+    // Preload the next frame so the animation doesn't flicker.
+    var next = radarLayer(radar.frames[(i + 1) % radar.frames.length]);
+    if (!map.hasLayer(next)) next.addTo(map);
+
+    var t = new Date(frame.time * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    $('radar-time').textContent = 'Radar: ' + t + (i === radar.frames.length - 1 ? ' (latest)' : '');
+  }
+
+  function stopRadarAnimation() {
+    clearInterval(radar.timer);
+    radar.timer = null;
+    radarPlay.textContent = '▶ Play';
+    radarPlay.setAttribute('aria-label', 'Play radar animation');
+  }
+
+  function loadRadar() {
+    if (!map) return;
+    fetch('https://api.rainviewer.com/public/weather-maps.json')
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.status);
+        return r.json();
+      })
+      .then(function (data) {
+        stopRadarAnimation();
+        clearRadarLayers();
+        radar.layers = {};
+        radar.index = -1;
+        radar.host = data.host;
+        radar.frames = (data.radar && data.radar.past) || [];
+        if (radar.frames.length) showRadarFrame(radar.frames.length - 1);
+      })
+      .catch(function () { $('radar-time').textContent = 'Radar is unavailable right now.'; });
+  }
+
+  radarToggle.addEventListener('change', function () {
+    if (!map) return;
+    if (radarToggle.checked) {
+      showRadarFrame(radar.index >= 0 ? radar.index : radar.frames.length - 1);
+    } else {
+      stopRadarAnimation();
+      clearRadarLayers();
+      $('radar-time').textContent = '';
+    }
+  });
+
+  radarPlay.addEventListener('click', function () {
+    if (radar.timer) { stopRadarAnimation(); return; }
+    if (!radar.frames.length) return;
+    if (!radarToggle.checked) { radarToggle.checked = true; }
+    radarPlay.textContent = '⏸ Pause';
+    radarPlay.setAttribute('aria-label', 'Pause radar animation');
+    radar.timer = setInterval(function () {
+      showRadarFrame((radar.index + 1) % radar.frames.length);
+    }, 700);
+  });
+
+  // ---------- storm tracker ----------
+  function renderStorm(d, start) {
+    var h = d.hourly;
+    var end = Math.min(start + 48, h.time.length);
+    var thunderHours = 0, firstThunder = null, maxCape = 0, maxGust = 0;
+    for (var i = start; i < end; i++) {
+      if (h.weather_code[i] >= 95) {
+        thunderHours++;
+        if (firstThunder === null) firstThunder = i;
+      }
+      if (h.cape[i] > maxCape) maxCape = h.cape[i];
+      if (h.wind_gusts_10m[i] > maxGust) maxGust = h.wind_gusts_10m[i];
+    }
+
+    // CAPE (J/kg) is the energy available to storms; higher values mean stronger
+    // updrafts and more lightning if storms form.
+    var level;
+    if (thunderHours && maxCape >= 1000) level = ['high', 'High'];
+    else if (thunderHours || maxCape >= 1500) level = ['moderate', 'Moderate'];
+    else if (maxCape >= 500) level = ['low', 'Low'];
+    else level = ['minimal', 'Minimal'];
+
+    var badge = $('storm-badge');
+    badge.className = 'risk-badge ' + level[0];
+    badge.textContent = '⚡ ' + level[1] + ' risk';
+
+    var text;
+    if (firstThunder !== null) {
+      var when = parseLocal(h.time[firstThunder]);
+      text = 'Thunderstorms are in the forecast, starting around ' +
+        when.toLocaleDateString([], { weekday: 'short' }) + ' ' + fmtHour(h.time[firstThunder]) +
+        '. When thunder roars, go indoors.';
+    } else if (maxCape >= 1500) {
+      text = 'No thunderstorms are forecast, but the air is unstable enough that storms could pop up.';
+    } else {
+      text = 'No thunderstorms are expected in the next 48 hours.';
+    }
+    $('storm-text').textContent = text;
+
+    var facts = $('storm-facts');
+    facts.innerHTML = '';
+    [
+      '⛈️ Stormy hours forecast: ' + thunderHours,
+      '🔋 Peak storm energy (CAPE): ' + round(maxCape) + ' J/kg',
+      '💨 Strongest gust: ' + round(maxGust) + ' ' + unitWind()
+    ].forEach(function (f) {
+      var li = document.createElement('li');
+      li.textContent = f;
+      facts.appendChild(li);
+    });
+
+    $('storm-card').hidden = false;
+  }
+
+  // Official alerts from the U.S. National Weather Service (free, no key, U.S. only).
+  var alertSeq = 0;
+  function fetchAlerts() {
+    var p = state.place;
+    var seq = ++alertSeq;
+    var list = $('alerts');
+    function message(text) {
+      list.innerHTML = '';
+      var li = document.createElement('li');
+      li.className = 'muted';
+      li.textContent = text;
+      list.appendChild(li);
+    }
+    if (!list.children.length) message('Checking for alerts…');
+
+    fetch('https://api.weather.gov/alerts/active?point=' + p.latitude.toFixed(4) + ',' + p.longitude.toFixed(4))
+      .then(function (r) {
+        if (r.status === 400 || r.status === 404) return null; // point outside the U.S.
+        if (!r.ok) throw new Error(r.status);
+        return r.json();
+      })
+      .then(function (data) {
+        if (seq !== alertSeq) return;
+        if (!data) { message('Official alerts are available for U.S. locations only.'); return; }
+        var alerts = data.features || [];
+        if (!alerts.length) { message('✅ No active weather alerts for this location.'); return; }
+        list.innerHTML = '';
+        alerts.forEach(function (a) {
+          var pr = a.properties;
+          var li = document.createElement('li');
+          li.className = 'alert ' + String(pr.severity || '').toLowerCase();
+          var det = document.createElement('details');
+          var sum = document.createElement('summary');
+          var strong = document.createElement('strong');
+          strong.textContent = '⚠️ ' + pr.event;
+          sum.appendChild(strong);
+          var ends = pr.ends || pr.expires;
+          if (ends) {
+            var small = document.createElement('small');
+            small.className = 'muted';
+            small.textContent = ' · until ' + new Date(ends).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+            sum.appendChild(small);
+          }
+          var body = document.createElement('p');
+          body.className = 'alert-body';
+          body.textContent = [pr.headline, pr.description, pr.instruction].filter(Boolean).join('\n\n');
+          det.appendChild(sum);
+          det.appendChild(body);
+          li.appendChild(det);
+          list.appendChild(li);
+        });
+      })
+      .catch(function () {
+        if (seq === alertSeq) message('Couldn\'t reach the National Weather Service right now.');
+      });
   }
 
   function setPlace(place) {
@@ -259,7 +462,7 @@
   function refresh() {
     clearInterval(state.timer);
     fetchWeather();
-    state.timer = setInterval(fetchWeather, REFRESH_MS);
+    state.timer = setInterval(function () { fetchWeather(); loadRadar(); }, REFRESH_MS);
   }
 
   // ---------- search ----------
